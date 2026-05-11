@@ -1,0 +1,189 @@
+---
+title: "Loan Default Prediction via Decision Trees"
+author: "Cameron Batts"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(readr)
+```
+
+```{r}
+loanData = readRDS("LoanData.rds")
+```
+
+```{r}
+glimpse(loanData)
+```
+
+```{r}
+head(loanData)
+```
+
+
+
+```{r}
+loanDataNoOutliers = loanData[!is.na(loanData$incomeAnnual) & !(2500000 < loanData$incomeAnnual), ]
+
+isMissingInterestRate = is.na(loanDataNoOutliers$interestRate)
+isMissingEmploymentYears = is.na(loanDataNoOutliers$employmentYears)
+
+loanDataNoOutliersNA = loanDataNoOutliers
+
+loanDataNoOutliersNA$interestRate[isMissingInterestRate] = median(loanDataNoOutliersNA$interestRate, na.rm = TRUE)
+naInterestRate = as.integer(isMissingInterestRate)
+loanDataNoOutliersNA = cbind(loanDataNoOutliersNA, naInterestRate)
+
+loanDataNoOutliersNA$employmentYears[isMissingEmploymentYears] = median(loanDataNoOutliersNA$employmentYears, na.rm = TRUE)
+naEmploymentYears = as.integer(isMissingEmploymentYears)
+loanDataNoOutliersNA = cbind(loanDataNoOutliersNA, naEmploymentYears)
+
+set.seed(2020)
+
+loanTestIndices = sample(1:nrow(loanDataNoOutliersNA), nrow(loanDataNoOutliersNA)*1/3, replace = FALSE)
+loanTest = loanDataNoOutliersNA[loanTestIndices, ]
+loanTrain = loanDataNoOutliersNA[-loanTestIndices, ]
+```
+
+```{r}
+getGini = function(good, bad) {
+   total = good+bad
+   return(2*(bad/total) * (good/total))
+}
+
+defaults = sum(loanData$isLoanDefault)
+non_defaults = sum(0 == loanData$isLoanDefault)
+
+gini_root = getGini(non_defaults, defaults)
+paste("The Gini of the root is:", gini_root)
+```
+
+
+```{r}
+# Left side counts
+defaults_left = 1000
+nondefaults_left = 8015
+gini_left = getGini(nondefaults_left, defaults_left)
+
+# Right side counts
+defaults_right = 2227
+nondefaults_right = 17850
+gini_right = getGini(nondefaults_right, defaults_right)
+
+# Total counts
+total_left = defaults_left + nondefaults_left
+total_right = defaults_right + nondefaults_right
+total_all = total_left + total_right
+
+# Gini gain
+gini_gain = gini_root -
+  (total_left/total_all * gini_left) -
+  (total_right/total_all * gini_right)
+
+gini_left
+gini_right
+gini_gain
+```
+
+
+```{r}
+# The gini_gain is essentially zero, indicating no value in purchasing feature xyz. The near-zero gain means the feature does not improve the purity of the split, suggesting the data is already relatively balanced or the feature provides no useful discriminatory power.
+```
+
+
+```{r}
+library(rpart)
+```
+
+
+```{r}
+tree_defaults = rpart(isLoanDefault ~ ., method="class", data = loanTrain)
+```
+
+
+```{r}
+# plot(tree_defaults) - commented out; produces an error because the tree has no splits
+```
+
+
+```{r}
+# Error: fit is not a tree, just a root
+# The decision tree produced no splits because the dataset is heavily imbalanced. With very few defaults relative to non-defaults, the gini gain from any split is near zero, so rpart creates only a root node with no branches.
+```
+
+
+```{r}
+# Select all rows where the loan defaulted
+loanTrain_default = loanData[1 == loanData$isLoanDefault, ]
+
+# Select all rows where the loan did not default
+loanTrain_nodefault = loanData[0 == loanData$isLoanDefault, ]
+
+# Randomly sample twice as many non-default cases as there are default cases to create a 2:1 ratio
+loanTestIndices = sample(1:nrow(loanTrain_nodefault), 2*nrow(loanTrain_default), replace = FALSE)
+
+# Keep only the sampled non-default rows
+loanTrain_nodefault = loanTrain_nodefault[loanTestIndices,]
+
+# Combine default and sampled non-default cases into one balanced training dataset
+loanTrain_balanced = rbind(loanTrain_default, loanTrain_nodefault)
+```
+
+
+```{r}
+library(rpart)
+```
+
+```{r}
+tree_balanced = rpart(isLoanDefault ~ .,
+                      data = loanTrain_balanced,
+                      control = rpart.control(cp = 0.001))
+
+plot(tree_balanced, uniform = TRUE)
+text(tree_balanced)
+```
+
+
+```{r}
+# uniform = TRUE creates equal vertical spacing between branches, producing a cleaner and more readable decision tree layout.
+```
+
+```{r}
+tree_balanced = rpart(isLoanDefault ~ .,
+                      data = loanTrain_balanced,
+                      control = rpart.control(cp = 0.001),
+                      parms = list(prior = c(0.7, 0.3)))
+
+plot(tree_balanced, uniform = TRUE)
+text(tree_balanced)
+```
+
+```{r}
+# M = 10 means a missed default (false negative) is penalized 10x more than a false positive
+M = 10
+
+tree_defaults_balanced_parms_lossmatrix = rpart(
+  isLoanDefault ~ .,
+  data = loanTrain_balanced,
+  control = rpart.control(cp = 0.001),
+  parms = list(loss = matrix(c(0, M, 1, 0), ncol = 2), prior = c(0.67, 0.33)))
+
+plot(tree_balanced, uniform = TRUE)
+text(tree_defaults_balanced_parms_lossmatrix, cex = 0.25)
+```
+
+```{r}
+# Prune using cp = 0.002 (midpoint of the 0.001 to 0.004 range)
+tree_lovely = prune(tree_defaults_balanced_parms_lossmatrix, cp = 0.002)
+
+plot(tree_lovely, uniform = TRUE)
+text(tree_lovely, cex = 0.25)
+```
