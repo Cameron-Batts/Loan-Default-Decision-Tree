@@ -1,186 +1,35 @@
-# Loan Default Prediction via Decision Trees
+# Loan Default Classification with Cost-Sensitive Trees
 
-![Decision Tree Model](./Images/Decision-Tree.png)
+**Author:** Cameron Batts
 
-## Project Overview
-This project explores loan default prediction using decision tree classification models in R. The analysis focuses on identifying borrower and loan characteristics associated with default risk while building interpretable classification models for predictive analysis.
+## Problem
+Examine class imbalance, classification-tree pruning and explicit false-negative cost assumptions.
 
-The project includes:
-- exploratory data analysis (EDA)
-- feature evaluation
-- decision tree modeling
-- tree pruning
-- model simplification
-- classification analysis
+## Approach
+Split by class before preprocessing, learn median fills on training rows, resample only training observations to a 2:1 nondefault/default ratio, explicitly fit a classification tree and prune at a fixed cp=0.002. Evaluate class-1 recall against an all-nondefault baseline.
 
----
+## Reported results
+The bundled dataset has 29,092 records, including 3,227 defaults (11.09%). The archived analysis illustrates a root-only initial tree and later tree structures, but reports no held-out classification metrics. Improved default detection has not been established.
 
-# Project Objectives
-- Analyze borrower financial characteristics
-- Identify variables associated with loan default risk
-- Build interpretable decision tree classification models
-- Compare full and pruned decision tree structures
-- Evaluate model simplicity versus predictive performance
+## Limitations and corrections
+Historical resampling used the full dataset after creating a split, and later rpart fits omitted method="class" while the response was numeric. This revision fixes both issues. Pruning uses the original fixed cp rather than claiming CV selection. Resampling changes prevalence and the 10:1 loss is illustrative. Training imputation precedes internal rpart CV, so its scores are not fully fold-isolated; final assessment uses the untouched test split.
 
----
+## Verification
+Dataset dimensions, missingness and relevant counts were checked directly. R is unavailable in this environment, so revised R code was reviewed but not parsed, executed or rendered. No new fitted-model performance is claimed.
 
-# Tools & Technologies
-- R
-- rpart
-- rpart.plot
-- tidyverse
-- ggplot2
-- caret
-- Decision Trees
-- Classification Modeling
+## Data
+The included data have no documented upstream source or redistribution license in the original repository. Preserve provenance when it becomes available.
 
----
-
-# Repository Structure
-
-```text
-Loan_Default_Decision_Tree/
-│
-├── Data/
-├── Images/
-│   ├── Decision-Tree.png
-│   └── Decision-Tree-1.png
-│
-├── Notebooks/
-├── Reports/
-└── README.md
+## Run
+Install R and Pandoc (or use RStudio), then run from the repository root:
+```r
+source("install.R")
+rmarkdown::render("Notebooks/loan_default_decision_tree.Rmd")
 ```
+Dependencies are unpinned.
 
----
-
-# Key Variables Analyzed
-- Interest Rate
-- Annual Income
-- Credit Grade
-- Loan Amount
-- Home Ownership
-- Employment Years
-- Loan Default Indicator
-
----
-
-# Exploratory Analysis
-
-The project explored relationships between:
-- borrower income
-- loan characteristics
-- credit grade
-- interest rate
-- default behavior
-
-The analysis focused on identifying the variables most associated with elevated default risk.
-
----
-
-# Decision Tree Modeling
-
-Two decision tree models were developed:
-1. Full decision tree model
-2. Simplified/pruned decision tree model
-
-The models were designed to classify borrower default outcomes while maintaining interpretability for business analysis and risk evaluation.
-
----
-
-# Full Decision Tree
-
-The full decision tree includes multiple borrower and financial characteristics to create detailed classification splits.
-
-Key split variables included:
-- interest rate
-- annual income
-- credit grade
-- loan amount
-- home ownership
-
-![Full Decision Tree](./Images/Decision-Tree-1.png)
-
----
-
-# Pruned Decision Tree
-
-The simplified decision tree reduces model complexity while preserving the most important predictive relationships.
-
-The pruned model improves interpretability and reduces overfitting risk.
-
-![Pruned Decision Tree](./Images/Decision-Tree.png)
-
----
-
-# Key Findings
-- Interest rate was one of the strongest predictors of loan default risk.
-- Annual income significantly influenced borrower classification outcomes.
-- Credit grade contributed meaningful separation between lower-risk and higher-risk borrowers.
-- Simpler tree structures improved interpretability while maintaining useful predictive performance.
-- Decision trees provided clear rule-based segmentation for loan risk evaluation.
-
----
-
-# Model Evaluation
-
-The project evaluated:
-- tree complexity
-- interpretability
-- predictive segmentation
-- split importance
-- classification structure
-
-The comparison between full and pruned trees highlighted the tradeoff between:
-- model complexity
-- interpretability
-- overfitting risk
-
----
-
-# Supporting Files
-
-This repository includes:
-- R notebooks
-- decision tree visualizations
-- classification outputs
-- model summaries
-- analytical reports
-
----
-
-# Skills Demonstrated
-- Decision tree modeling
-- Classification analysis
-- Predictive analytics
-- Model pruning
-- Exploratory data analysis
-- Statistical analysis
-- R programming
-- Data visualization
-- Risk modeling
-
----
-
-# Data
-
-This project uses borrower financial and loan performance data to evaluate default prediction through classification modeling.
-
-The dataset includes:
-- borrower demographics
-- financial characteristics
-- loan information
-- credit-related variables
-- loan default outcomes
-
-The data was used to build interpretable predictive decision tree models.
-
----
-
-# Author
-
-Cameron Batts
-
-GitHub: https://github.com/Cameron-Batts
-
-Portfolio: https://cameron-batts.github.io
-
+## Files
+- [R Markdown analysis](Notebooks/loan_default_decision_tree.Rmd)
+- [Readable report](Reports/loan_default_decision_tree.html)
+- [Original PDF](Reports/Loan%20Default%20Prediction%20via%20Decision%20Trees.pdf) — historical export; conclusions may predate the corrections above.
+- [Live portfolio report](https://cameron-batts.github.io/loan_default_decision_tree.html)
