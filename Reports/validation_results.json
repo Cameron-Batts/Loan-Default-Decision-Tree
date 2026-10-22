@@ -1,0 +1,38 @@
+{
+  "training_rows": 19395,
+  "test_rows": 9696,
+  "resampled_training_rows": 6456,
+  "pruned_terminal_nodes": 23,
+  "test_metrics": {
+    "accuracy": 0.1805899339934,
+    "precision_default": 0.1179087875417,
+    "recall_default": 0.9860465116279,
+    "specificity": 0.08015311448788,
+    "balanced_accuracy": 0.5330998130579
+  },
+  "all_nondefault_metrics": {
+    "accuracy": 0.8891295379538,
+    "precision_default": null,
+    "recall_default": 0,
+    "specificity": 1,
+    "balanced_accuracy": 0.5
+  },
+  "checked_at_utc": "2026-10-22 22:06:37 UTC",
+  "R_version": "R version 4.5.3 (2026-03-11)",
+  "package_versions": {
+    "knitr": "1.52",
+    "rmarkdown": "2.32",
+    "jsonlite": "2.0.0",
+    "dplyr": "1.2.1",
+    "ggplot2": "4.0.3",
+    "forecast": "9.0.2",
+    "vars": "1.6.1",
+    "rpart": "4.1.27",
+    "ggfortify": "0.4.24",
+    "broom": "1.0.13",
+    "nycflights13": "1.0.2",
+    "rpart.plot": "3.1.5"
+  },
+  "source": "Notebooks/loan_default_decision_tree.Rmd",
+  "scope": "Revised R Markdown workflow executed and rendered; archived historical analyses are not claimed as reproduced when preprocessing or evaluation changed."
+}
