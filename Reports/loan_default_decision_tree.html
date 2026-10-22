@@ -1,0 +1,98 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loan Default Classification with Cost-Sensitive Trees | Cameron Batts</title><style>body{margin:0;background:#f7f8fa;color:#152540;font:16px/1.65 system-ui}main{max-width:950px;margin:auto;padding:32px 24px}h1{font:bold 2.4rem Georgia}h2{border-bottom:2px solid #e8c97a;margin-top:36px}pre{padding:18px;background:white;border-left:3px solid #c9a84c;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}details{margin:16px 0}summary{cursor:pointer}p{overflow-wrap:anywhere}a{color:#1a3560}img{max-width:100%;height:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd}</style><main><a href="https://cameron-batts.github.io/">← Portfolio</a><h1>Loan Default Classification with Cost-Sensitive Trees</h1><p><strong>Cameron Batts</strong></p><h2>Problem</h2><p>Examine class imbalance, classification-tree pruning and explicit false-negative cost assumptions.</p><h2>Approach</h2><p>Split by class before preprocessing, learn median fills on training rows, resample only training observations to a 2:1 nondefault/default ratio, explicitly fit a classification tree and prune at a fixed cp=0.002. Evaluate class-1 recall against an all-nondefault baseline.</p><h2>Reported results</h2><p>The bundled dataset has 29,092 records, including 3,227 defaults (11.09%). The archived analysis illustrates a root-only initial tree and later tree structures, but reports no held-out classification metrics. Improved default detection has not been established.</p><h2>Limitations and corrections</h2><p>Historical resampling used the full dataset after creating a split, and later rpart fits omitted method=&quot;class&quot; while the response was numeric. This revision fixes both issues. Pruning uses the original fixed cp rather than claiming CV selection. Resampling changes prevalence and the 10:1 loss is illustrative. Training imputation precedes internal rpart CV, so its scores are not fully fold-isolated; final assessment uses the untouched test split.</p><h2>Data</h2><p>The included data have no documented upstream source or redistribution license in the original repository. Preserve provenance when it becomes available.</p><h2>Verification</h2><p>Dataset dimensions, missingness and relevant counts were checked directly. R is unavailable in this environment, so revised R code was reviewed but not parsed, executed or rendered. No new fitted-model performance is claimed.</p><p><a href="https://github.com/Cameron-Batts/Loan-Default-Decision-Tree/blob/main/Notebooks/loan_default_decision_tree.Rmd">View revised R Markdown source</a></p><details><summary>Revised R Markdown workflow (not executed here)</summary><pre>---
+title: &quot;Loan Default Classification with Cost-Sensitive Trees&quot;
+author: &quot;Cameron Batts&quot;
+output: html_document
+---
+
+## Problem
+Examine class imbalance, classification-tree pruning and explicit false-negative cost assumptions.
+
+## Approach
+Split by class before preprocessing, learn median fills on training rows, resample only training observations to a 2:1 nondefault/default ratio, explicitly fit a classification tree and prune at a fixed cp=0.002. Evaluate class-1 recall against an all-nondefault baseline.
+
+## Reported results
+The bundled dataset has 29,092 records, including 3,227 defaults (11.09%). The archived analysis illustrates a root-only initial tree and later tree structures, but reports no held-out classification metrics. Improved default detection has not been established.
+
+## Limitations and corrections
+Historical resampling used the full dataset after creating a split, and later rpart fits omitted method=&quot;class&quot; while the response was numeric. This revision fixes both issues. Pruning uses the original fixed cp rather than claiming CV selection. Resampling changes prevalence and the 10:1 loss is illustrative. Training imputation precedes internal rpart CV, so its scores are not fully fold-isolated; final assessment uses the untouched test split.
+
+## Verification
+Dataset dimensions, missingness and relevant counts were checked directly. R is unavailable in this environment, so revised R code was reviewed but not parsed, executed or rendered. No new fitted-model performance is claimed.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+project_root &lt;- if (dir.exists(&quot;Data&quot;)) &quot;.&quot; else &quot;..&quot;
+knitr::opts_knit$set(root.dir = normalizePath(project_root))
+```
+
+```{r preparation}
+loans &lt;- readRDS(&quot;Data/LoanData.rds&quot;)
+stopifnot(all(loans$isLoanDefault %in% c(0, 1)))
+# Fixed data-quality rule; no outcomes are used to choose exclusions.
+loans &lt;- loans[!is.na(loans$incomeAnnual) &amp; loans$incomeAnnual &lt;= 2500000, ]
+loans$isLoanDefault &lt;- factor(loans$isLoanDefault, levels = c(0, 1))
+set.seed(2020)
+# Split within class before learning imputation values or resampling.
+test_rows &lt;- unlist(lapply(split(seq_len(nrow(loans)), loans$isLoanDefault),
+                          function(rows) sample(rows, floor(length(rows) / 3))))
+train &lt;- loans[-test_rows, ]
+test &lt;- loans[test_rows, ]
+stopifnot(length(intersect(rownames(train), rownames(test))) == 0)
+for (v in c(&quot;interestRate&quot;, &quot;employmentYears&quot;)) {
+  fill &lt;- median(train[[v]], na.rm = TRUE)
+  stopifnot(is.finite(fill))
+  train[[paste0(v, &quot;_missing&quot;)]] &lt;- as.integer(is.na(train[[v]]))
+  test[[paste0(v, &quot;_missing&quot;)]] &lt;- as.integer(is.na(test[[v]]))
+  train[[v]][is.na(train[[v]])] &lt;- fill
+  test[[v]][is.na(test[[v]])] &lt;- fill
+}
+stopifnot(!anyNA(train), !anyNA(test))
+metrics &lt;- function(truth, predicted) {
+  cm &lt;- table(actual = factor(truth, levels = c(0, 1)),
+              predicted = factor(predicted, levels = c(0, 1)))
+  tn &lt;- cm[1,1]; fp &lt;- cm[1,2]; fn &lt;- cm[2,1]; tp &lt;- cm[2,2]
+  ratio &lt;- function(a,b) if (b == 0) NA_real_ else a/b
+  print(cm)
+  c(accuracy = (tn+tp)/sum(cm), precision_default = ratio(tp,tp+fp),
+    recall_default = ratio(tp,tp+fn), specificity = ratio(tn,tn+fp),
+    balanced_accuracy = mean(c(ratio(tp,tp+fn),ratio(tn,tn+fp))))
+}
+```
+## Fit a classification tree
+The original source resampled from the full dataset after splitting and omitted `method=&quot;class&quot;` in later fits with a numeric target. This revision resamples only training rows and uses an explicit classification target. Test results from this revision have not been generated here.
+
+```{r fit-tree}
+library(rpart)
+default_rows &lt;- which(train$isLoanDefault == &quot;1&quot;)
+nondefault_rows &lt;- which(train$isLoanDefault == &quot;0&quot;)
+set.seed(2020)
+keep &lt;- c(default_rows, sample(nondefault_rows,
+                               min(length(nondefault_rows), 2 * length(default_rows))))
+resampled &lt;- train[keep, ]
+# Row = actual class, column = predicted class; FN costs 10, FP costs 1.
+loss &lt;- matrix(c(0, 10, 1, 0), nrow = 2,
+               dimnames = list(c(&quot;0&quot;, &quot;1&quot;), c(&quot;0&quot;, &quot;1&quot;)))
+fit &lt;- rpart(isLoanDefault ~ ., data = resampled, method = &quot;class&quot;,
+             parms = list(loss = loss),
+             control = rpart.control(cp = 0.001, xval = 10))
+# Prespecified complexity setting, retained from the original example.
+# The rpart CV table is diagnostic; cp was not selected by CV in this workflow.
+printcp(fit)
+pruned &lt;- prune(fit, cp = 0.002)
+if (nrow(pruned$frame) &gt; 1) {
+  plot(pruned, uniform = TRUE)
+  text(pruned, use.n = TRUE, cex = 0.6)
+} else {
+  message(&quot;Pruned model contains a root node only.&quot;)
+}
+```
+
+## Evaluate once on the held-out observations
+```{r evaluate}
+predicted &lt;- predict(pruned, newdata = test, type = &quot;class&quot;)
+stopifnot(!anyNA(predicted))
+metrics(test$isLoanDefault, predicted)
+metrics(test$isLoanDefault, rep(&quot;0&quot;, nrow(test)))
+```
+The 2:1 sampling changes class prevalence. Tree probabilities should not be interpreted as calibrated population default probabilities. The assumed 10:1 loss is illustrative; no operational benefit has been established. Training medians are fitted before rpart&#x27;s internal CV, so those CV scores are not fully fold-isolated. The untouched test split is the final performance check.
+</pre></details><h2>Historical visualizations</h2><p>Images below are retained from the original analysis and do not represent execution of the revised workflow. Historical labels may use stronger claims than the corrected interpretation above supports.</p><figure><img alt="Historical Decision-Tree visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Loan-Default-Decision-Tree/main/Images/Decision-Tree.png"><figcaption>Decision-Tree — historical output</figcaption></figure><figure><img alt="Historical Decision-Tree-1 visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Loan-Default-Decision-Tree/main/Images/Decision-Tree-1.png"><figcaption>Decision-Tree-1 — historical output</figcaption></figure></main></html>
